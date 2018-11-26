@@ -46,9 +46,10 @@ function  PRINT_HELP() {
         echo
         echo " The config file is sourced and so can execute any required commands"
         echo " The following variables can be set. only the -c flag is used then"
+        echo " the file needs to set the [required] variables"
         echo " Any values with [set] simply need to be set to any value"
         echo " To disable these values set to an empty string or \`unset\` them"
-        echo " the file needs to set the [required] variables"
+        echo
         echo " REMOTE_HOSTNAME  : [required] Remote server to backup FQDN hostname"
         echo " BACKUP_ROOT      : [required] Local working directory for backups"
         echo " COMPRESS         : [set] Enable gzip compression"
@@ -58,7 +59,7 @@ function  PRINT_HELP() {
         echo " BACKUP_FOLDER    : Backup directory."
         echo "                    defaults to \$(date +\"%Y-%m-%d\")"
         echo " SSH_CONNECT_ARGS : SSH arguments."
-        echo " "
+        echo
         echo " Backups are stored under the following path:"
         echo " Files: BACKUP_ROOT/path/SERVER_NAME"
         echo " Compressed Files: BACKUP_ROOT/path/SERVER_NAME.tar.gz"
