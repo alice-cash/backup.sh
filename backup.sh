@@ -110,8 +110,6 @@ BACKUP_FULL_PATH=${BACKUP_ROOT}/${BACKUP_FOLDER}/${REMOTE_HOSTNAME}
 
 mkdir ${V_ARG} -p ${BACKUP_FULL_PATH}{,-MYSQL}
 
-#${BACKUP_MYSQL_COMMAND} ${REMOTE_HOSTNAME} ${BACKUP_FULL_PATH}-MYSQL 1
-
 [[ "${BACKUP_FILES}" ]] && {
         rsync ${V_ARG} -aAX --delete-after --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/backup/*"} ${REMOTE_HOSTNAME}:/ ${BACKUP_FULL_PATH}/;
         [[ "$COMPRESS" ]] && tar --remove-files ${V_ARG} -czf ${BACKUP_FULL_PATH}{.tar.gz,};
