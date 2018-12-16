@@ -35,9 +35,12 @@ function  PRINT_HELP() {
         echo "  -p path : Specify current backup option. Defaults to /YYY-MM-DD/"
         echo "  -q      : Silent output, other than errors"
         echo "  -e args : SSH arguments"
-        echo "  -c file : Specify a configuration file to load values from"
+        echo "  -r args : RSYNC arguments"
+        echo "  -s path : Specify a Seed path that is first copied to reduce bandwidth"
         echo "            Just a config file can be specified as long as it sets"
         echo "            the required variables."
+        echo "  -s path : Specify a Seed path that is first copied to reduce bandwidth"
+        echo "  -z      : Don't execute but instead echo all variables."
         echo
         echo " SERVER_NAME can be a FQDN configured in ~/.ssh/config or any required ssh"
         echo " arguments can be supplied via the -e flag."
@@ -46,10 +49,9 @@ function  PRINT_HELP() {
         echo
         echo " The config file is sourced and so can execute any required commands"
         echo " The following variables can be set. only the -c flag is used then"
-        echo " the file needs to set the [required] variables"
         echo " Any values with [set] simply need to be set to any value"
         echo " To disable these values set to an empty string or \`unset\` them"
-        echo
+        echo " the file needs to set the [required] variables"
         echo " REMOTE_HOSTNAME  : [required] Remote server to backup FQDN hostname"
         echo " BACKUP_ROOT      : [required] Local working directory for backups"
         echo " COMPRESS         : [set] Enable gzip compression"
@@ -57,8 +59,15 @@ function  PRINT_HELP() {
         echo " BACKUP_FILES     : [set] Do Filesystem backup"
         echo " QUIET            : [set] Mute output other than errors"
         echo " BACKUP_FOLDER    : Backup directory."
-        echo "                    defaults to \$(date +\"%Y-%m-%d\")"
+        echo " RSYNC_ARGS       : Specify custom arguments for rsync"
+        echo " SEED_FOLDER      : Seed Folder is used as a base to reduce bandwidth usage"
+s       echo "                    defaults to \$(date +\"%Y-%m-%d\")"
         echo " SSH_CONNECT_ARGS : SSH arguments."
+        echo
+        echo " You can use the -z flag to generate a config flag, e.g."
+        echo " ${SCRIPT_NAME} -xmf server1 /backup -z > /backup/server1.conf"
+        echo " Once saved, you can use just this config in crons, e.g."
+        echo " ${SCRIPT_NAME} -c /backup/server1.conf"
         echo
         echo " Backups are stored under the following path:"
         echo " Files: BACKUP_ROOT/path/SERVER_NAME"
@@ -106,7 +115,7 @@ shift
         exit 1;
 }
 
-while getopts "hxmfqp:e:c:" opt; do
+while getopts "hxmfqzp:e:c:s:r:" opt; do
   case ${opt} in
     h )
         PRINT_HELP;
@@ -124,6 +133,12 @@ while getopts "hxmfqp:e:c:" opt; do
     p )
         BACKUP_FOLDER=$OPTARG;
         ;;
+    s )
+        SEED_FOLDER=$OPTARG;
+        ;;
+    r )
+        RSYNC_ARGS=$OPTARG;
+        ;;
     q )
         QUIET=1;
         ;;
@@ -133,6 +148,9 @@ while getopts "hxmfqp:e:c:" opt; do
     c )
         source $OPTARG;
         ;;
+    z )
+        ECHO_ENV=1;
+        ;;
     \? )
             PRINT_HELP
             exit 1;
@@ -140,11 +158,36 @@ while getopts "hxmfqp:e:c:" opt; do
   esac
 done
 
-[[ -z ${BACKUP_FOLDER} ]] && BACKUP_FOLDER=$(date +"%Y-%m-%d")
+# As this is dynamically generated we need to specify that with the -z flag
+[[ -z ${BACKUP_FOLDER} ]] && {
+        [[ "${ECHO_ENV}" ]] && BACKUP_FOLDER='$(date +"%Y-%m-%d")' ||
+                               BACKUP_FOLDER=$(date +"%Y-%m-%d")
+                   }
+[[ "${QUIET}" ]] && V_ARG= || V_ARG='-v'
+
+[[ -z ${RSYNC_ARGS} ]] && RSYNC_ARGS='-aAX --delete-after --inplace --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/backup/*"}'
+
+[[ "${ECHO_ENV}" ]] && {
+
+        echo REMOTE_HOSTNAME="'${REMOTE_HOSTNAME}'"
+        echo BACKUP_ROOT="'${BACKUP_ROOT}'"
+        echo COMPRESS="'${COMPRESS}'"
+        echo BACKUP_MYSQL="'${BACKUP_MYSQL}'"
+        echo BACKUP_FILES="'${BACKUP_FILES}'"
+        echo QUIET="'${QUIET}'"
+        [[ ${BACKUP_FOLDER} == *'$'* ]] && echo BACKUP_FOLDER="${BACKUP_FOLDER}" || echo BACKUP_FOLDER="'${BACKUP_FOLDER}'"
+        echo SEED_FOLDER="'${SEED_FOLDER}'"
+        echo SSH_CONNECT_ARGS="'${SSH_CONNECT_ARGS}'"
+        echo RSYNC_ARGS="'${RSYNC_ARGS}'"
+        exit 1;
+}
 
 BACKUP_FULL_PATH=${BACKUP_ROOT}/${BACKUP_FOLDER}/${REMOTE_HOSTNAME}
+SEED_FULL_PATH=${BACKUP_ROOT}/${SEED_FOLDER}/${REMOTE_HOSTNAME}
 
-[[ -z ${QUIET} ]] && [[ "${BACKUP_FILES}" ]] && {
+
+
+[[ -z ${QUIET} ]] && [[ -z ${QUIET} ]] && [[ "${BACKUP_FILES}" ]] && {
         echo -n  "Backing up ${SERVER_NAME} files to ${BACKUP_FULL_PATH}";
         [[ "${COMPRESS}" ]] && echo ".tar.gz" || echo;
 }
@@ -153,12 +196,11 @@ BACKUP_FULL_PATH=${BACKUP_ROOT}/${BACKUP_FOLDER}/${REMOTE_HOSTNAME}
         [[ "${COMPRESS}" ]] && echo " with gzip compression" || echo;
 }
 
-[[ "${QUIET}" ]] && V_ARG= || V_ARG='-v'
-
 mkdir ${V_ARG} -p ${BACKUP_FULL_PATH}{,-MYSQL}
 
 [[ "${BACKUP_FILES}" ]] && {
-        rsync ${V_ARG} -e "ssh ${SSH_CONNECT_ARGS}" -aAX --delete-after --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/backup/*"} ${REMOTE_HOSTNAME}:/ ${BACKUP_FULL_PATH}/;
+        [[ "$SEED_FOLDER" ]] && rsync -aAX ${SEED_FULL_PATH}/ ${BACKUP_FULL_PATH}/
+        rsync ${V_ARG} -e "ssh ${SSH_CONNECT_ARGS}" -aAX --delete-after --inplace --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/backup/*"} ${REMOTE_HOSTNAME}:/ ${BACKUP_FULL_PATH}/;
         [[ "$COMPRESS" ]] && tar --remove-files ${V_ARG} -czf ${BACKUP_FULL_PATH}{.tar.gz,};
 }
 
