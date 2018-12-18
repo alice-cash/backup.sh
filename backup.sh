@@ -165,7 +165,7 @@ done
                    }
 [[ "${QUIET}" ]] && V_ARG= || V_ARG='-v'
 
-[[ -z ${RSYNC_ARGS} ]] && RSYNC_ARGS='-aAX --delete-after --inplace --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found","/backup/*"}'
+[[ -z ${RSYNC_ARGS} ]] && RSYNC_ARGS='-aAX --delete-after --inplace --exclude=/dev/* --exclude=/proc/* --exclude=/sys/* --exclude=/tmp/* --exclude=/run/* --exclude=/mnt/* --exclude=/media/* --exclude=/lost+found --exclude=/backup/*'
 
 [[ "${ECHO_ENV}" ]] && {
 
